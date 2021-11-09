@@ -1,14 +1,10 @@
 const router = require('express').Router();
-const {envelopesController,validateEnvelope} = require('../controllers/envelopes')
+const envelopesController = require('../controllers/envelopes')
 
-router.get('/envelopes',envelopesController.getEnvelopes);
-router.param('id',envelopesController.paramId);
-router.get('/envelopes/:id',envelopesController.getEnvelopesById);
-router.post('/envelopes',validateEnvelope,envelopesController.postEnvelopes);
-router.param('amount',envelopesController.paramAmount);
-router.post('/envelopes/:id/withdraw/:amount',envelopesController.postAmount);
-router.delete('/envelopes/:id',envelopesController.deleteByID);
-router.param('to',envelopesController.paramTo);
-router.post('/envelopes/:id/:to/:amount',envelopesController.postToAmount);
-
+router.get('/',envelopesController.getEnvelopes);
+router.get('/:envelopeId',envelopesController.getEnvelopesById);
+router.post('/',envelopesController.addEnvelopes);
+router.put('/:envelopeId',envelopesController.updateEnvelopes);
+router.delete('/:envelopeId',envelopesController.deletedEnvelopes);
+router.post('/transfer/:from/:to',envelopesController.transferEnvelopes);
 module.exports = router

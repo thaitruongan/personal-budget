@@ -9,9 +9,13 @@ const app = express();
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(cors())
+app.use(express.static('public'));
 
-app.use('/api',require('./routes/envelopes'));
-
+app.use('/', (req, res) => {
+  res.render('./public/index.html')
+})
+app.use('/api/envelopes',require('./routes/envelopes'));
+app.use('/api/transactions',require('./routes/transactions'));
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {

@@ -1,94 +1,99 @@
-const e = require('express');
-const {envelopes} = require('../config/db');
-const {getElementById, getNewId, getIndexById} = require('../utils/utils');
-
+const pool = require('../config/db');
 
 const envelopesController = {
-    getEnvelopes:(req,res) =>{
-        res.status(200).send(envelopes);
-        console.log(envelopes)
-    },
-    paramId:(req,res,next)=>{
-        const id = Number(req.params.id);
-        if(id){
-            const envelope = getElementById(envelopes,id);
-            if(envelope){
-                req.body.envelope = envelope;
-                next();
-            }else{
-                res.status(404).send();
+    getEnvelopes: async(req,res) =>{
+        try{
+            const allEnvelopes = await pool.query('SELECT * FROM envelopes ORDER BY id');
+            if(allEnvelopes.row < 1){
+                return res.status(404).send({
+                    message:"There are no envelopes"
+                });
             }
-        }else{
-            res.status(400).send();
+            res.status(200).send({
+                status:"Success",
+                message: 'Envelopes information retrieved!',
+                data: allEnvelopes.rows,
+            });
+        }catch(err){
+            console.log(err.message);
         }
     },
-
-    getEnvelopesById:(req,res)=>{
-        res.status(200).send(req.body.envelope);
-    },
-    
-    postEnvelopes: (req,res) => {
-        const envelope = req.envelope;
-        envelope.id = getNewId(envelopes);
-        envelopes.push(envelope);
-        res.status(201).send(envelope);
-    },
-
-    paramAmount: (req,res,next)=>{
-        const withdraw = Number(req.params.amount);
-        const envelope = req.body.envelope;
-        if(withdraw < envelope.balance){
-            envelope.balance -= withdraw;
-            req.body.amount = withdraw;
-            req.body.envelope = envelope;
-            next();
-        }else{
-            res.status(400).send(envelope);
+    getEnvelopesById: async(req,res) =>{
+        try{
+            const {envelopeId} = req.params;
+            const anEnvelope = await pool.query('SELECT * FROM envelopes WHERE id = $1', [envelopeId]);
+            if(anEnvelope.row < 1){
+                return res.status(404).send({
+                    message: "There is no envelope with this id"
+                });
+            };
+            res.status(200).send({
+                status: 'Success',
+                message: 'Envelope information retrieved!',
+                data: anEnvelope.rows[0]
+            });
+        }catch(err){
+            console.log(err.message)
         }
     },
-
-    postAmount:(req,res) =>{
-        res.status(400).send(req.body.envelope);
+    addEnvelopes: async(req,res) =>{
+        try {
+            const { title, budget } = req.body;
+            const newEnvelope = await pool.query('INSERT INTO envelopes (title, budget) VALUES ($1, $2) RETURNING *', 
+            [title, budget]);
+            res.status(201).send({
+                status: 'Success',
+                message: 'New envelope created!',
+                data: newEnvelope.rows[0]
+            });
+        } catch (error) {
+            console.error(error.message);
+        };
     },
-
-    deleteByID:(req,res)=>{
-        const index = getIndexById(envelopes,req.body.envelope.id);
-        envelopes.splice(index,1);
-        res.status(204).send();
-    },
-
-    paramTo:(req,res,next)=>{
-        const to = Number(req.params.to);
-        if(to){
-            const toEnvelope = getElementById(envelopes, to);
-            if(toEnvelope){
-                req.body.toEnvelope = toEnvelope;
-                next();
-            }else{
-                res.status(404).send();
-            }
-        }else{
-            res.status(400).send();
+    updateEnvelopes: async(req,res)=>{
+        try{
+            const {envelopeId} = req.params;
+            const {title, budget} = req.body;
+            const updatedEnvelope = await pool.query('UPDATE envelopes SET title = $1, budget = $2 WHERE id = $3', 
+            [title, budget, envelopeId]);
+            res.status(200).send({
+                status: 'Success',
+                message: 'The envelope has been updated!',
+                data: updatedEnvelope.rows[0]
+            }) 
+        }catch(err){
+            console.log(err.message)
         }
     },
-
-    postToAmount:(req,res)=>{
-        const toEnvelope = req.body.toEnvelope;
-        const amount = req.body.amount;
-        toEnvelope.balance += amount;
-        res.status(200).send();
+    deletedEnvelopes: async(req,res)=>{
+        try{
+            const {envelopeId} = req.params;
+            const findEnvelope = await pool.query('SELECT * FROM envelopes WHERE id = $1', [envelopeId]);
+            if(findEnvelope.row < 1){
+                return res.status(404).send({
+                    message: "There is no envelope with this id"
+                });
+            };
+            await pool.query('DELETE FROM envelopes WHERE id = $1', [envelopeId]);
+            res.status(200).send({
+                message: "Success"
+            })
+        }catch(err){
+            console.log(err.message)
+        }
     },
+    transferEnvelopes: async(req,res)=>{
+        try{
+            const {from, to} = req.params;
+            const {amount} = req.body;
+            await pool.query('UPDATE envelopes SET budget = budget - $1 WHERE id = $2', [amount, from]);
+            await pool.query('UPDATE envelopes SET budget = budget + $1 WHERE id = $2', [amount, to]);
+            res.json(`The budget of the envelopes number ${from} and ${to} have been successfully updated`);
+        }catch(err){
+            console.log(err.message)
+        }
+    } 
 
 }
 
-const validateEnvelope = (req, res, next) => {
-    const envelope = req.body;
-    if (envelope.category && envelope.balance) {
-      req.envelope = envelope;
-      next();
-    } else {
-      res.status(400).send();
-    }
-  };
-
-module.exports = {envelopesController,validateEnvelope}
+module.exports = envelopesController
